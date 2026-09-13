@@ -1,0 +1,268 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <tuple>
+
+using namespace std;
+
+class Solver {
+private:
+    struct Edge {
+        int to;
+        long long weight;
+    };
+
+    int n;
+    long long D;
+
+    vector<vector<Edge> > tree;
+    vector<int> subSize;
+    vector<bool> blocked;
+
+    long long answer;
+
+    void getSize(int u, int parent) {
+        subSize[u] = 1;
+
+        for (const Edge &e : tree[u]) {
+            if (e.to == parent || blocked[e.to])
+                continue;
+
+            getSize(e.to, u);
+            subSize[u] += subSize[e.to];
+        }
+    }
+
+    int getCentroid(int u, int parent, int total) {
+        for (const Edge &e : tree[u]) {
+            if (e.to == parent || blocked[e.to])
+                continue;
+
+            if (subSize[e.to] > total / 2)
+                return getCentroid(e.to, u, total);
+        }
+
+        return u;
+    }
+
+    void collect(int u, int parent, long long dist,
+                 vector<long long> &distances) {
+        if (dist > D)
+            return;
+
+        distances.push_back(dist);
+
+        for (const Edge &e : tree[u]) {
+            if (e.to == parent || blocked[e.to])
+                continue;
+
+            collect(e.to, u, dist + e.weight, distances);
+        }
+    }
+
+    long long countPairs(vector<long long> &distances) {
+        if (distances.size() < 2)
+            return 0;
+
+        sort(distances.begin(), distances.end());
+
+        long long res = 0;
+
+        int left = 0;
+        int right = (int)distances.size() - 1;
+
+        while (left < right) {
+            if (distances[left] + distances[right] <= D) {
+                res += right - left;
+                ++left;
+            } else {
+                --right;
+            }
+        }
+
+        return res;
+    }
+
+    void processCentroid(int centroid) {
+        vector<long long> all;
+        all.push_back(0);
+
+        for (const Edge &e : tree[centroid]) {
+            if (blocked[e.to])
+                continue;
+
+            vector<long long> part;
+
+            collect(
+                e.to,
+                centroid,
+                e.weight,
+                part
+            );
+
+            /*
+             * Count pairs between the current subtree
+             * and all previously processed subtrees.
+             *
+             * Add the centroid distance 0 automatically,
+             * so centroid-to-node pairs are also counted.
+             */
+            for (long long x : part) {
+                for (size_t j = 0; j < all.size(); ++j) {
+                    if (x + all[j] <= D)
+                        ++answer;
+                }
+            }
+
+            /*
+             * Instead of checking every pair here,
+             * the above direct loop can be expensive.
+             * We therefore merge the distances and use
+             * sorting below for the efficient implementation.
+             */
+
+            all.insert(all.end(), part.begin(), part.end());
+        }
+    }
+
+    /*
+     * Efficient centroid processing.
+     *
+     * For each centroid:
+     *   1. Collect distances from each neighboring subtree.
+     *   2. Count all valid pairs among all distances.
+     *   3. Subtract pairs lying inside the same subtree.
+     */
+    void processCentroidFast(int centroid) {
+        vector<long long> allDistances;
+        allDistances.push_back(0);
+
+        for (const Edge &e : tree[centroid]) {
+            if (blocked[e.to])
+                continue;
+
+            vector<long long> current;
+
+            collect(
+                e.to,
+                centroid,
+                e.weight,
+                current
+            );
+
+            /*
+             * Count pairs between current subtree and
+             * everything collected previously.
+             *
+             * Sort both vectors and use two pointers.
+             */
+            sort(current.begin(), current.end());
+            sort(allDistances.begin(), allDistances.end());
+
+            int j = (int)allDistances.size() - 1;
+
+            for (int i = 0; i < (int)current.size(); ++i) {
+                while (j >= 0 &&
+                       current[i] + allDistances[j] > D) {
+                    --j;
+                }
+
+                if (j < 0)
+                    break;
+
+                answer += j + 1;
+            }
+
+            allDistances.insert(
+                allDistances.end(),
+                current.begin(),
+                current.end()
+            );
+        }
+    }
+
+    void decompose(int start) {
+        getSize(start, -1);
+
+        int centroid = getCentroid(
+            start,
+            -1,
+            subSize[start]
+        );
+
+        processCentroidFast(centroid);
+
+        blocked[centroid] = true;
+
+        for (const Edge &e : tree[centroid]) {
+            if (!blocked[e.to]) {
+                decompose(e.to);
+            }
+        }
+    }
+
+public:
+    Solver(int nodes, long long limit)
+        : n(nodes),
+          D(limit),
+          tree(nodes + 1),
+          subSize(nodes + 1, 0),
+          blocked(nodes + 1, false),
+          answer(0) {
+    }
+
+    void addEdge(int u, int v, long long w) {
+        tree[u].push_back({v, w});
+        tree[v].push_back({u, w});
+    }
+
+    long long solve() {
+        decompose(1);
+        return answer;
+    }
+};
+
+long long countSensorPairs(
+    int n,
+    long long D,
+    const vector<tuple<int, int, long long> > &edges
+) {
+    Solver solver(n, D);
+
+    for (size_t i = 0; i < edges.size(); ++i) {
+        int u, v;
+        long long w;
+
+        tie(u, v, w) = edges[i];
+
+        solver.addEdge(u, v, w);
+    }
+
+    return solver.solve();
+}
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(NULL);
+
+    int n;
+    long long D;
+
+    cin >> n >> D;
+
+    vector<tuple<int, int, long long> > edges;
+    edges.reserve(n - 1);
+
+    for (int i = 0; i < n - 1; ++i) {
+        int u, v;
+        long long w;
+
+        cin >> u >> v >> w;
+
+        edges.push_back(make_tuple(u, v, w));
+    }
+
+    cout << countSensorPairs(n, D, edges) << '\n';
+
+    return 0;
+}

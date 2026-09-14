@@ -1,0 +1,212 @@
+#include <iostream>
+#include <vector>
+#include <tuple>
+#include <algorithm>
+using namespace std;
+
+class BIT {
+    int n;
+    vector<int> tree;
+
+public:
+    BIT(int n) : n(n), tree(n + 1, 0) {}
+
+    void update(int pos, int val) {
+        while (pos <= n) {
+            tree[pos] += val;
+            pos += pos & -pos;
+        }
+    }
+
+    int query(int pos) const {
+        int ans = 0;
+        while (pos > 0) {
+            ans += tree[pos];
+            pos -= pos & -pos;
+        }
+        return ans;
+    }
+
+    int rangeQuery(int l, int r) const {
+        if (l > r) return 0;
+        return query(r) - query(l - 1);
+    }
+};
+
+void user_logic(
+    int n,
+    vector<pair<int, int>>& edges,
+    vector<tuple<int, int, int>>& queries,
+    vector<int>& results
+) {
+    vector<vector<int>> adj(n + 1);
+
+    for (auto &e : edges) {
+        adj[e.first].push_back(e.second);
+        adj[e.second].push_back(e.first);
+    }
+
+    vector<int> parent(n + 1);
+    vector<int> depth(n + 1);
+    vector<int> size(n + 1, 1);
+    vector<int> heavy(n + 1, 0);
+    vector<int> order;
+
+    order.reserve(n);
+
+    vector<int> st;
+    st.push_back(1);
+    parent[1] = 0;
+
+    while (!st.empty()) {
+        int u = st.back();
+        st.pop_back();
+
+        order.push_back(u);
+
+        for (int v : adj[u]) {
+            if (v == parent[u])
+                continue;
+
+            parent[v] = u;
+            depth[v] = depth[u] + 1;
+            st.push_back(v);
+        }
+    }
+
+    for (int i = n - 1; i >= 1; --i) {
+        int u = order[i];
+        int p = parent[u];
+
+        size[p] += size[u];
+
+        if (heavy[p] == 0 || size[u] > size[heavy[p]]) {
+            heavy[p] = u;
+        }
+    }
+
+    vector<int> head(n + 1);
+    vector<int> pos(n + 1);
+
+    int timer = 0;
+
+    vector<pair<int, int>> tasks;
+    tasks.push_back({1, 1});
+
+    while (!tasks.empty()) {
+        auto [u0, h] = tasks.back();
+        tasks.pop_back();
+
+        int u = u0;
+
+        while (u != 0) {
+            head[u] = h;
+            pos[u] = ++timer;
+
+            for (int v : adj[u]) {
+                if (parent[v] == u && v != heavy[u]) {
+                    tasks.push_back({v, v});
+                }
+            }
+
+            u = heavy[u];
+        }
+    }
+
+    BIT bit(n);
+    vector<int> active(n + 1, 1);
+
+    active[1] = 0;
+
+    for (int v = 2; v <= n; ++v) {
+        bit.update(pos[v], 1);
+    }
+
+    auto getPathSum = [&](int u, int v) {
+        int ans = 0;
+
+        while (head[u] != head[v]) {
+            if (depth[head[u]] < depth[head[v]]) {
+                swap(u, v);
+            }
+
+            ans += bit.rangeQuery(pos[head[u]], pos[u]);
+            u = parent[head[u]];
+        }
+
+        if (depth[u] > depth[v]) {
+            swap(u, v);
+        }
+
+        ans += bit.rangeQuery(pos[u] + 1, pos[v]);
+
+        return ans;
+    };
+
+    for (int i = 0; i < (int)queries.size(); ++i) {
+        int type = get<0>(queries[i]);
+
+        if (type == 1) {
+            int v = get<1>(queries[i]);
+
+            if (active[v]) {
+                active[v] = 0;
+                bit.update(pos[v], -1);
+            } else {
+                active[v] = 1;
+                bit.update(pos[v], 1);
+            }
+        } else {
+            int u = get<1>(queries[i]);
+            int v = get<2>(queries[i]);
+
+            results[i] = getPathSum(u, v);
+        }
+    }
+}
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n;
+    cin >> n;
+
+    vector<pair<int, int>> edges(n - 1);
+
+    for (int i = 0; i < n - 1; ++i) {
+        cin >> edges[i].first >> edges[i].second;
+    }
+
+    int q;
+    cin >> q;
+
+    vector<tuple<int, int, int>> queries(q);
+
+    for (int i = 0; i < q; ++i) {
+        int type;
+        cin >> type;
+
+        if (type == 1) {
+            int v;
+            cin >> v;
+            queries[i] = {type, v, -1};
+        } else {
+            int u, v;
+            cin >> u >> v;
+            queries[i] = {type, u, v};
+        }
+    }
+
+    vector<int> results(q);
+
+    user_logic(n, edges, queries, results);
+
+    for (int i = 0; i < q; ++i) {
+        if (get<0>(queries[i]) == 2) {
+            cout << results[i] << '\n';
+        }
+    }
+
+    return 0;
+}

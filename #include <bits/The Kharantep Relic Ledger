@@ -1,0 +1,137 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+struct DSU {
+    vector<int> parent, sz;
+
+    DSU(int n) : parent(n + 1), sz(n + 1, 1) {
+        iota(parent.begin(), parent.end(), 0);
+    }
+
+    int find(int x) {
+        if (parent[x] == x)
+            return x;
+        return parent[x] = find(parent[x]);
+    }
+
+    int mergeRoots(int a, int b) {
+        if (a == b)
+            return a;
+
+        parent[b] = a;
+        sz[a] += sz[b];
+
+        return a;
+    }
+};
+
+struct Relic {
+    int value;
+    int room;
+
+    bool operator<(const Relic& other) const {
+        if (value != other.value)
+            return value > other.value;
+        return room < other.room;
+    }
+};
+
+void process_entries(
+    int n,
+    int m,
+    const vector<int>& chamber_values,
+    const vector<pair<string, vector<int>>>& entries,
+    vector<pair<int, int>>& results
+) {
+    DSU dsu(n);
+    vector<set<Relic>> relics(n + 1);
+
+    for (int i = 1; i <= n; ++i) {
+        if (chamber_values[i - 1] != 0) {
+            relics[i].insert({chamber_values[i - 1], i});
+        }
+    }
+
+    for (const auto& entry : entries) {
+        if (entry.first == "LINK") {
+            int u = entry.second[0];
+            int v = entry.second[1];
+
+            int a = dsu.find(u);
+            int b = dsu.find(v);
+
+            if (a == b)
+                continue;
+
+            if (relics[a].size() < relics[b].size())
+                swap(a, b);
+
+            for (const auto& r : relics[b]) {
+                relics[a].insert(r);
+            }
+
+            relics[b].clear();
+
+            dsu.mergeRoots(a, b);
+        }
+        else {
+            int x = entry.second[0];
+            int root = dsu.find(x);
+
+            if (relics[root].empty()) {
+                results.push_back({-1, -1});
+            }
+            else {
+                auto it = relics[root].begin();
+
+                results.push_back({it->room, it->value});
+
+                relics[root].erase(it);
+            }
+        }
+    }
+}
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n, m;
+    cin >> n >> m;
+
+    vector<int> chamber_values(n);
+
+    for (int i = 0; i < n; ++i) {
+        cin >> chamber_values[i];
+    }
+
+    vector<pair<string, vector<int>>> entries(m);
+
+    for (int i = 0; i < m; ++i) {
+        cin >> entries[i].first;
+
+        if (entries[i].first == "LINK") {
+            int u, v;
+            cin >> u >> v;
+            entries[i].second = {u, v};
+        }
+        else {
+            int x;
+            cin >> x;
+            entries[i].second = {x};
+        }
+    }
+
+    vector<pair<int, int>> results;
+
+    process_entries(n, m, chamber_values, entries, results);
+
+    for (const auto& ans : results) {
+        if (ans.first == -1)
+            cout << "EMPTY\n";
+        else
+            cout << ans.first << " " << ans.second << '\n';
+    }
+
+    return 0;
+}

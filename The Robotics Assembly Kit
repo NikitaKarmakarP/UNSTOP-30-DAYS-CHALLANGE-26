@@ -1,0 +1,76 @@
+#include <iostream>
+#include <unordered_map>
+
+int user_logic(int n, int m, const std::string& belt, const std::unordered_map<char, int>& requirements) {
+    int need[26] = {0};
+    int total[26] = {0};
+    int window[26] = {0};
+
+    int requiredTypes = 0;
+
+    // Store required counts
+    for (auto &entry : requirements) {
+        need[entry.first - 'A'] = entry.second;
+        requiredTypes++;
+    }
+
+    // Count total occurrences in the belt
+    for (char ch : belt) {
+        total[ch - 'A']++;
+    }
+
+    // Check if solution is possible
+    for (int i = 0; i < 26; i++) {
+        if (need[i] > total[i]) {
+            return -1;
+        }
+    }
+
+    int left = 0;
+    int matchedTypes = 0;
+    int answer = n + 1;
+
+    for (int right = 0; right < n; right++) {
+        int idx = belt[right] - 'A';
+        window[idx]++;
+
+        if (need[idx] > 0 && window[idx] == need[idx]) {
+            matchedTypes++;
+        }
+
+        while (matchedTypes == requiredTypes) {
+            answer = std::min(answer, right - left + 1);
+
+            int removeIdx = belt[left] - 'A';
+            if (need[removeIdx] > 0 && window[removeIdx] == need[removeIdx]) {
+                matchedTypes--;
+            }
+
+            window[removeIdx]--;
+            left++;
+        }
+    }
+
+    return (answer == n + 1) ? -1 : answer;
+  return -1;
+}
+
+int main() {
+    int n, m;
+    std::cin >> n >> m;
+
+    std::string belt;
+    std::cin >> belt;
+
+    std::unordered_map<char, int> requirements;
+    for (int i = 0; i < m; ++i) {
+        char component_type;
+        int count;
+        std::cin >> component_type >> count;
+        requirements[component_type] = count;
+    }
+
+    int result = user_logic(n, m, belt, requirements);
+    std::cout << result << std::endl;
+    return 0;
+}

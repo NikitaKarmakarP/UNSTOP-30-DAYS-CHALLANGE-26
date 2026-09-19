@@ -1,0 +1,44 @@
+#include <iostream>
+#include <vector>
+#include <deque>
+using namespace std;
+
+int longestSteadyWindow(const vector<int>& speed, int n, int limit) {
+    deque<int> maxDeque, minDeque;
+    int left = 0;
+    int best = 0;
+
+    for (int right = 0; right < n; right++) {
+
+        while (!maxDeque.empty() && speed[maxDeque.back()] <= speed[right])
+            maxDeque.pop_back();
+        maxDeque.push_back(right);
+
+        while (!minDeque.empty() && speed[minDeque.back()] >= speed[right])
+            minDeque.pop_back();
+        minDeque.push_back(right);
+
+        while (speed[maxDeque.front()] - speed[minDeque.front()] > limit) {
+            if (maxDeque.front() == left) maxDeque.pop_front();
+            if (minDeque.front() == left) minDeque.pop_front();
+            left++;
+        }
+
+        best = max(best, right - left + 1);
+    }
+
+    return best;
+}
+
+int main() {
+    int n, limit;
+    cin >> n >> limit;
+
+    vector<int> speed(n);
+    for (int i = 0; i < n; i++) {
+        cin >> speed[i];
+    }
+
+    cout << longestSteadyWindow(speed, n, limit);
+    return 0;
+}

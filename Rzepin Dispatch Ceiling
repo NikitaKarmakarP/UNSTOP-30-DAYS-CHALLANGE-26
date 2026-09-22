@@ -1,0 +1,129 @@
+#include <iostream>
+#include <vector>
+#include <tuple>
+#include <queue>
+#include <limits>
+
+using namespace std;
+
+struct Edge {
+    int to;
+    int fuel;
+    int turb;
+};
+
+struct State {
+    long long cost;
+    int node;
+    int usedTurb;
+
+    bool operator<(const State &other) const {
+        return cost > other.cost;
+    }
+};
+
+void calculate_min_fuel_cost(
+    int n,
+    int m,
+    int R,
+    const vector<tuple<int, int, int, int>> &legs,
+    const vector<pair<int, int>> &requests,
+    vector<long long> &results
+) {
+    vector<vector<Edge>> graph(n + 1);
+
+    for (auto &e : legs) {
+        int u, v, fuel, turb;
+        tie(u, v, fuel, turb) = e;
+        graph[u].push_back({v, fuel, turb});
+    }
+
+    const long long INF = numeric_limits<long long>::max() / 4;
+    int statesPerNode = R + 1;
+
+    vector<long long> dist((n + 1) * statesPerNode, INF);
+
+    auto id = [&](int node, int t) {
+        return node * statesPerNode + t;
+    };
+
+    priority_queue<State> pq;
+
+    dist[id(1, 0)] = 0;
+    pq.push({0, 1, 0});
+
+    while (!pq.empty()) {
+        State cur = pq.top();
+        pq.pop();
+
+        int idx = id(cur.node, cur.usedTurb);
+
+        if (cur.cost != dist[idx]) continue;
+
+        for (const Edge &e : graph[cur.node]) {
+            int nextTurb = cur.usedTurb + e.turb;
+            if (nextTurb > R) continue;
+
+            int nextIdx = id(e.to, nextTurb);
+            long long nextCost = cur.cost + e.fuel;
+
+            if (nextCost < dist[nextIdx]) {
+                dist[nextIdx] = nextCost;
+                pq.push({nextCost, e.to, nextTurb});
+            }
+        }
+    }
+
+    vector<vector<long long>> best(n + 1, vector<long long>(R + 1, INF));
+
+    for (int node = 1; node <= n; node++) {
+        best[node][0] = dist[id(node, 0)];
+        for (int t = 1; t <= R; t++) {
+            long long exact = dist[id(node, t)];
+            best[node][t] = min(best[node][t - 1], exact);
+        }
+    }
+
+    results.clear();
+    results.reserve(requests.size());
+
+    for (auto &q : requests) {
+        int dest = q.first;
+        int tol = q.second;
+
+        long long ans = best[dest][tol];
+        if (ans == INF)
+            results.push_back(-1);
+        else
+            results.push_back(ans);
+    }
+}
+
+int main() {
+    int n, m, R;
+    cin >> n >> m >> R;
+
+    vector<tuple<int, int, int, int>> legs(m);
+    for (int i = 0; i < m; i++) {
+        int u, v, fuel, turb;
+        cin >> u >> v >> fuel >> turb;
+        legs[i] = make_tuple(u, v, fuel, turb);
+    }
+
+    int q;
+    cin >> q;
+
+    vector<pair<int, int>> requests(q);
+    for (int i = 0; i < q; i++) {
+        cin >> requests[i].first >> requests[i].second;
+    }
+
+    vector<long long> results;
+    calculate_min_fuel_cost(n, m, R, legs, requests, results);
+
+    for (long long x : results) {
+        cout << x << "\n";
+    }
+
+    return 0;
+}

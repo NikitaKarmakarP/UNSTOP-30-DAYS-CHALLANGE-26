@@ -1,0 +1,207 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <tuple>
+#include <unordered_map>
+#include <set>
+
+using namespace std;
+
+struct Node {
+    int child[2];
+    int cnt;
+    int bestId;
+    Node() {
+        child[0] = child[1] = -1;
+        cnt = 0;
+        bestId = 2000000000;
+    }
+};
+
+void process_log_entries(int M, const vector<tuple<string, int, int>>& log_entries) {
+
+    vector<Node> trie(1);
+    unordered_map<int, pair<int, int>> active;
+    unordered_map<int, multiset<int>> idsByCode;
+
+    auto refresh = [&](const vector<int>& path) {
+        for (int i = (int)path.size() - 1; i >= 0; i--) {
+            int node = path[i];
+
+            if (trie[node].cnt == 0) {
+                trie[node].bestId = 2000000000;
+                continue;
+            }
+
+            int ans = 2000000000;
+
+            if (i == (int)path.size() - 1) {
+                int code = path.back();
+            }
+
+            int left = trie[node].child[0];
+            int right = trie[node].child[1];
+
+            if (left != -1 && trie[left].cnt > 0)
+                ans = min(ans, trie[left].bestId);
+
+            if (right != -1 && trie[right].cnt > 0)
+                ans = min(ans, trie[right].bestId);
+
+            trie[node].bestId = ans;
+        }
+    };
+
+    for (auto entry : log_entries) {
+
+        string type = get<0>(entry);
+
+        if (type == "ON") {
+
+            int id = get<1>(entry);
+            int code = get<2>(entry);
+
+            active[id] = {code, id};
+            idsByCode[code].insert(id);
+
+            int node = 0;
+            vector<int> path;
+            path.push_back(0);
+
+            trie[node].cnt++;
+
+            for (int b = 19; b >= 0; b--) {
+                int bit = (code >> b) & 1;
+
+                if (trie[node].child[bit] == -1) {
+                    trie[node].child[bit] = trie.size();
+                    trie.push_back(Node());
+                }
+
+                node = trie[node].child[bit];
+                trie[node].cnt++;
+                path.push_back(node);
+            }
+
+            trie[node].bestId = *idsByCode[code].begin();
+
+            for (int i = (int)path.size() - 2; i >= 0; i--) {
+                int cur = path[i];
+                int ans = 2000000000;
+
+                for (int k = 0; k < 2; k++) {
+                    int nxt = trie[cur].child[k];
+                    if (nxt != -1 && trie[nxt].cnt > 0)
+                        ans = min(ans, trie[nxt].bestId);
+                }
+                trie[cur].bestId = ans;
+            }
+
+        } else if (type == "OFF") {
+
+            int id = get<1>(entry);
+            int code = active[id].first;
+
+            idsByCode[code].erase(idsByCode[code].find(id));
+
+            int node = 0;
+            vector<int> path;
+            path.push_back(0);
+
+            trie[node].cnt--;
+
+            for (int b = 19; b >= 0; b--) {
+                int bit = (code >> b) & 1;
+                node = trie[node].child[bit];
+                trie[node].cnt--;
+                path.push_back(node);
+            }
+
+            if (idsByCode[code].empty())
+                trie[node].bestId = 2000000000;
+            else
+                trie[node].bestId = *idsByCode[code].begin();
+
+            for (int i = (int)path.size() - 2; i >= 0; i--) {
+                int cur = path[i];
+
+                if (trie[cur].cnt == 0) {
+                    trie[cur].bestId = 2000000000;
+                    continue;
+                }
+
+                int ans = 2000000000;
+
+                for (int k = 0; k < 2; k++) {
+                    int nxt = trie[cur].child[k];
+                    if (nxt != -1 && trie[nxt].cnt > 0)
+                        ans = min(ans, trie[nxt].bestId);
+                }
+
+                trie[cur].bestId = ans;
+            }
+
+            active.erase(id);
+
+        } else {
+
+            int value = get<1>(entry);
+
+            int node = 0;
+            int result = 0;
+
+            for (int b = 19; b >= 0; b--) {
+
+                int bit = (value >> b) & 1;
+                int want = bit ^ 1;
+
+                if (trie[node].child[want] != -1 &&
+                    trie[trie[node].child[want]].cnt > 0) {
+
+                    result |= (1 << b);
+                    node = trie[node].child[want];
+
+                } else {
+
+                    node = trie[node].child[bit];
+                }
+            }
+
+            cout << result << " " << trie[node].bestId << "\n";
+        }
+    }
+}
+
+int main() {
+
+    int M;
+    cin >> M;
+
+    vector<tuple<string, int, int>> log_entries;
+
+    for (int i = 0; i < M; i++) {
+
+        string command;
+        cin >> command;
+
+        if (command == "ON") {
+            int id, code;
+            cin >> id >> code;
+            log_entries.push_back(make_tuple(command, id, code));
+
+        } else if (command == "OFF") {
+            int id;
+            cin >> id;
+            log_entries.push_back(make_tuple(command, id, 0));
+
+        } else {
+            int code;
+            cin >> code;
+            log_entries.push_back(make_tuple(command, code, 0));
+        }
+    }
+
+    process_log_entries(M, log_entries);
+
+    return 0;
+}

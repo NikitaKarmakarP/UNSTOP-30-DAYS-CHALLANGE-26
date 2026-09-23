@@ -1,0 +1,118 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+struct TrieNode {
+    int child[26];
+
+    TrieNode() {
+        fill(child, child + 26, -1);
+    }
+};
+
+struct Event {
+    string type;
+    string word;
+    int era;
+};
+
+class PrefixEraCounter {
+private:
+    vector<TrieNode> trie;
+
+    // key = (trie node, era)
+    // value = number of codes having this prefix and era
+    unordered_map<unsigned long long, int> freq;
+
+    unsigned long long makeKey(int node, int era) {
+        return (static_cast<unsigned long long>(node) << 32)
+             | static_cast<unsigned int>(era);
+    }
+
+public:
+    PrefixEraCounter() {
+        trie.emplace_back();
+        freq.reserve(400000);
+        freq.max_load_factor(0.7);
+    }
+
+    void add(const string& s, int era) {
+        int node = 0;
+
+        // Empty prefix represents the root as well.
+        ++freq[makeKey(node, era)];
+
+        for (char ch : s) {
+            int c = ch - 'a';
+
+            if (trie[node].child[c] == -1) {
+                trie[node].child[c] = (int)trie.size();
+                trie.emplace_back();
+            }
+
+            node = trie[node].child[c];
+            ++freq[makeKey(node, era)];
+        }
+    }
+
+    int query(const string& prefix, int era) {
+        int node = 0;
+
+        for (char ch : prefix) {
+            int c = ch - 'a';
+
+            if (trie[node].child[c] == -1) {
+                return 0;
+            }
+
+            node = trie[node].child[c];
+        }
+
+        auto it = freq.find(makeKey(node, era));
+
+        if (it == freq.end()) {
+            return 0;
+        }
+
+        return it->second;
+    }
+};
+
+vector<int> process_events(const vector<Event>& events) {
+    PrefixEraCounter counter;
+    vector<int> answers;
+
+    for (const auto& event : events) {
+        if (event.type == "ADD") {
+            counter.add(event.word, event.era);
+        } 
+        else if (event.type == "QUERY") {
+            answers.push_back(counter.query(event.word, event.era));
+        }
+    }
+
+    return answers;
+}
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int Q;
+    cin >> Q;
+
+    vector<Event> events(Q);
+
+    for (int i = 0; i < Q; ++i) {
+        cin >> events[i].type
+            >> events[i].word
+            >> events[i].era;
+    }
+
+    vector<int> answers = process_events(events);
+
+    for (int x : answers) {
+        cout << x << '\n';
+    }
+
+    return 0;
+}

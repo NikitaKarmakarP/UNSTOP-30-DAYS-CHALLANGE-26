@@ -1,0 +1,177 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+using ll = long long;
+
+const ll MOD = 1000000007LL;
+
+struct SegNode {
+    int lch = 0;
+    int rch = 0;
+    ll total = 0;
+    ll tag = -1;
+};
+
+vector<SegNode> tree;
+
+int makeCopy(int id) {
+    tree.push_back(tree[id]);
+    return (int)tree.size() - 1;
+}
+
+void setValue(int id, int L, int R, ll x) {
+    tree[id].total = (x % MOD) * (R - L + 1LL) % MOD;
+    tree[id].tag = x;
+}
+
+void propagate(int id, int L, int R) {
+    if (tree[id].tag == -1 || L == R)
+        return;
+
+    int M = L + (R - L) / 2;
+    ll x = tree[id].tag;
+
+    int a = makeCopy(tree[id].lch);
+    int b = makeCopy(tree[id].rch);
+
+    tree[id].lch = a;
+    tree[id].rch = b;
+
+    setValue(a, L, M, x);
+    setValue(b, M + 1, R, x);
+
+    tree[id].tag = -1;
+}
+
+int rangeSet(int previous, int L, int R,
+             int ql, int qr, ll value) {
+
+    if (R < ql || qr < L)
+        return previous;
+
+    int current = makeCopy(previous);
+
+    if (ql <= L && R <= qr) {
+        setValue(current, L, R, value);
+        return current;
+    }
+
+    propagate(current, L, R);
+
+    int M = L + (R - L) / 2;
+
+    tree[current].lch =
+        rangeSet(tree[current].lch, L, M, ql, qr, value);
+
+    tree[current].rch =
+        rangeSet(tree[current].rch, M + 1, R, ql, qr, value);
+
+    tree[current].total =
+        (tree[tree[current].lch].total +
+         tree[tree[current].rch].total) % MOD;
+
+    return current;
+}
+
+ll rangeSum(int id, int L, int R, int ql, int qr) {
+
+    if (R < ql || qr < L)
+        return 0;
+
+    if (ql <= L && R <= qr)
+        return tree[id].total;
+
+    if (tree[id].tag != -1) {
+        int leftPart = max(L, ql);
+        int rightPart = min(R, qr);
+
+        if (leftPart > rightPart)
+            return 0;
+
+        return tree[id].tag *
+               (rightPart - leftPart + 1LL) % MOD;
+    }
+
+    int M = L + (R - L) / 2;
+
+    ll leftSum = rangeSum(tree[id].lch, L, M, ql, qr);
+    ll rightSum = rangeSum(tree[id].rch, M + 1, R, ql, qr);
+
+    return (leftSum + rightSum) % MOD;
+}
+
+int createTree(int L, int R) {
+    int id = (int)tree.size();
+    tree.emplace_back();
+
+    if (L == R)
+        return id;
+
+    int M = L + (R - L) / 2;
+
+    tree[id].lch = createTree(L, M);
+    tree[id].rch = createTree(M + 1, R);
+
+    return id;
+}
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n;
+    cin >> n;
+
+    vector<ll> value(n + 1);
+
+    for (int i = 1; i <= n; ++i)
+        cin >> value[i];
+
+    tree.reserve(1 + n * 30);
+
+    int initialRoot = createTree(1, n);
+
+    vector<int> version(n + 1);
+    version[0] = initialRoot;
+
+    /*
+        Stack keeps indices whose values are strictly decreasing.
+        For position r, positions after the previous greater element
+        all get value[r] as their suffix maximum.
+    */
+    vector<int> mono;
+    mono.reserve(n);
+
+    for (int r = 1; r <= n; ++r) {
+
+        while (!mono.empty() &&
+               value[mono.back()] <= value[r]) {
+            mono.pop_back();
+        }
+
+        int previousGreater = mono.empty() ? 0 : mono.back();
+
+        version[r] = rangeSet(
+            version[r - 1],
+            1,
+            n,
+            previousGreater + 1,
+            r,
+            value[r]
+        );
+
+        mono.push_back(r);
+    }
+
+    int Q;
+    cin >> Q;
+
+    while (Q--) {
+        int l, r;
+        cin >> l >> r;
+
+        cout << rangeSum(version[r], 1, n, l, r) << '\n';
+    }
+
+    return 0;
+}

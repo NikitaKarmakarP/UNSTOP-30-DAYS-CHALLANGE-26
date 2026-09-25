@@ -1,0 +1,112 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+struct Road {
+    int u, v, cost;
+};
+
+struct Query {
+    int x, y, budget, index;
+};
+
+class DSU {
+    vector<int> parent, size;
+
+public:
+    DSU(int n) {
+        parent.resize(n + 1);
+        size.assign(n + 1, 1);
+        iota(parent.begin(), parent.end(), 0);
+    }
+
+    int findParent(int node) {
+        while (parent[node] != node) {
+            parent[node] = parent[parent[node]];
+            node = parent[node];
+        }
+        return node;
+    }
+
+    void connect(int a, int b) {
+        int pa = findParent(a);
+        int pb = findParent(b);
+
+        if (pa == pb) return;
+
+        if (size[pa] < size[pb]) swap(pa, pb);
+
+        parent[pb] = pa;
+        size[pa] += size[pb];
+    }
+};
+
+void check_reachability(int n, int m, int q,
+                        vector<tuple<int, int, int>> &corridors,
+                        vector<tuple<int, int, int>> &scenarios) {
+
+    vector<Road> roads(m);
+    for (int i = 0; i < m; i++) {
+        roads[i] = {get<0>(corridors[i]), get<1>(corridors[i]), get<2>(corridors[i])};
+    }
+
+    sort(roads.begin(), roads.end(),
+         [](const Road &a, const Road &b) {
+             return a.cost < b.cost;
+         });
+
+    vector<Query> queries(q);
+    for (int i = 0; i < q; i++) {
+        queries[i] = {get<0>(scenarios[i]),
+                      get<1>(scenarios[i]),
+                      get<2>(scenarios[i]),
+                      i};
+    }
+
+    sort(queries.begin(), queries.end(),
+         [](const Query &a, const Query &b) {
+             return a.budget < b.budget;
+         });
+
+    DSU dsu(n);
+    vector<string> answer(q);
+
+    int ptr = 0;
+
+    for (int i = 0; i < q; i++) {
+        while (ptr < m && roads[ptr].cost <= queries[i].budget) {
+            dsu.connect(roads[ptr].u, roads[ptr].v);
+            ptr++;
+        }
+
+        if (dsu.findParent(queries[i].x) == dsu.findParent(queries[i].y))
+            answer[queries[i].index] = "YES";
+        else
+            answer[queries[i].index] = "NO";
+    }
+
+    for (int i = 0; i < q; i++) {
+        cout << answer[i] << "\n";
+    }
+}
+
+int main() {
+    int n, m, q;
+    cin >> n >> m >> q;
+
+    vector<tuple<int, int, int>> corridors(m);
+    for (int i = 0; i < m; i++) {
+        int u, v, w;
+        cin >> u >> v >> w;
+        corridors[i] = {u, v, w};
+    }
+
+    vector<tuple<int, int, int>> scenarios(q);
+    for (int i = 0; i < q; i++) {
+        int a, b, limit;
+        cin >> a >> b >> limit;
+        scenarios[i] = {a, b, limit};
+    }
+
+    check_reachability(n, m, q, corridors, scenarios);
+    return 0;
+}
